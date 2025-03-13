@@ -73,10 +73,10 @@ func getFilesFromGitTree(gitRootDir, revisionTree, excludeArg, restrictArg strin
 	}
 
 	excludePatters, restrictPatterns := make([]string, 0), make([]string, 0)
-	if len(excludePatters) != 0 {
+	if len(excludeArg) != 0 {
 		excludePatters = strings.Split(excludeArg, ",")
 	}
-	if len(restrictPatterns) != 0 {
+	if len(restrictArg) != 0 {
 		restrictPatterns = strings.Split(restrictArg, ",")
 	}
 
@@ -93,8 +93,6 @@ func getFilesFromGitTree(gitRootDir, revisionTree, excludeArg, restrictArg strin
 			} else if len(excludePatters) != 0 {
 				if !matchesAnyPattern(file, excludePatters) {
 					files = append(files, file)
-				} else {
-					fmt.Println(file)
 				}
 			} else {
 				files = append(files, file)
