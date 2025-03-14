@@ -1,16 +1,14 @@
 package main
 
-import (
-	"fmt"
-	"github.com/GlebMoskalev/gitfame/internal/git"
-)
+import "github.com/GlebMoskalev/gitfame/internal/git"
 
 func main() {
-	files, err := git.GetFilesRepository(
-		"",
-		"",
-		"",
-		"",
-	)
-	fmt.Println(files, err)
+	git.CalculateStats("/Users/glebmoskalev/Учеба/FlowerApp", "HEAD", "", "", "", "c#", false)
+	//files, err := git.GetFilesRepository(
+	//	".",
+	//	"HEAD",
+	//	"",
+	//	"",
+	//)
+	//fmt.Println(files, err)
 }

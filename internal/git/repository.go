@@ -2,82 +2,117 @@ package git
 
 import (
 	"fmt"
+	"github.com/GlebMoskalev/gitfame/configs"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
-func GetFilesRepository(path, revision, excludeArg, restrictArg string) ([]string, error) {
-	if path == "" {
-		path = "."
-	}
-
-	if revision == "" {
-		revision = "HEAD"
-	}
-
-	if _, err := os.Stat(path); err != nil {
-		return nil, fmt.Errorf("directory does not exist: %s", path)
-	}
-
-	gitRootDir, err := getGitRootDir(path)
-	if err != nil {
-		return nil, err
-	}
-
-	if err = validateRevision(gitRootDir, revision); err != nil {
-		return nil, err
-	}
-
-	files, err := getFilesFromGitTree(gitRootDir, revision, excludeArg, restrictArg)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return files, nil
+type RepositorySnapshot struct {
+	GitRootDir string
+	Files      []string
+	Revision   string
+	Filters    Filters
 }
 
-func getGitRootDir(path string) (string, error) {
+type Filters struct {
+	ExcludePatterns  []string
+	RestrictPatterns []string
+	Extensions       []string
+}
+
+func NewRepositorySnapshot(
+	repositoryPath,
+	revision,
+	extensionsArg,
+	excludeArg,
+	restrictArg,
+	languagesArg string) (*RepositorySnapshot, error) {
+	rs := &RepositorySnapshot{
+		Revision: revision,
+	}
+	if err := rs.getGitRootDir(repositoryPath); err != nil {
+		return nil, err
+	}
+	if err := rs.validateRevision(); err != nil {
+		return nil, err
+	}
+	excludePatters, restrictPatterns, extensions := make([]string, 0), make([]string, 0), make([]string, 0)
+	if excludeArg != "" {
+		excludePatters = strings.Split(excludeArg, ",")
+	}
+	if restrictArg != "" {
+		restrictPatterns = strings.Split(restrictArg, ",")
+	}
+	if extensionsArg != "" {
+		extensions = strings.Split(extensionsArg, ",")
+	}
+	rs.Filters.ExcludePatterns = excludePatters
+	rs.Filters.RestrictPatterns = restrictPatterns
+	rs.Filters.Extensions = extensions
+
+	if languagesArg != "" {
+		languagesMap, err := configs.LoadLanguageExtensions()
+		if err != nil {
+			return nil, err
+		}
+		languages := strings.Split(languagesArg, ",")
+		for _, l := range languages {
+			languageExtensions, ok := languagesMap[l]
+			if !ok {
+				return nil, fmt.Errorf("language %q is not in the supported list (available: %v)", l, maps.Keys(languagesMap))
+			}
+			rs.Filters.Extensions = append(rs.Filters.Extensions, languageExtensions...)
+		}
+	}
+
+	if err := rs.getFilesFromGitTree(); err != nil {
+		return nil, err
+	}
+
+	return rs, nil
+}
+
+func (rs *RepositorySnapshot) getGitRootDir(path string) error {
+	if _, err := os.Stat(path); err != nil {
+		return fmt.Errorf("directory does not exist: %s", path)
+	}
+
 	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
 	cmd.Dir = path
 	out, err := cmd.Output()
 	if err != nil {
 		if exitErr := err.(*exec.ExitError); exitErr.ExitCode() == 128 {
-			return "", fmt.Errorf("not a git repository: %s:", path)
+			return fmt.Errorf("not a git repository: %s:", path)
 		}
-		return "", fmt.Errorf("failed to get git root: %v", err)
+		return fmt.Errorf("failed to get git root: %v", err)
 	}
-	return strings.TrimSpace(string(out)), nil
-}
-
-func validateRevision(gitRootDir, revision string) error {
-	cmd := exec.Command("git", "cat-file", "commit", revision)
-	cmd.Dir = gitRootDir
-	if err := cmd.Run(); err != nil {
-		if exitErr := err.(*exec.ExitError); exitErr.ExitCode() == 128 {
-			return fmt.Errorf("invalid revision: %s", revision)
-		}
-		return fmt.Errorf("failed to validate revision: %v", err)
-	}
+	rs.GitRootDir = strings.TrimSpace(string(out))
 	return nil
 }
 
-func getFilesFromGitTree(gitRootDir, revisionTree, excludeArg, restrictArg string) ([]string, error) {
-	cmd := exec.Command("git", "ls-tree", "-r", revisionTree)
-	cmd.Dir = gitRootDir
-	out, err := cmd.Output()
-	if err != nil {
-		return nil, err
+func (rs *RepositorySnapshot) validateRevision() error {
+	cmd := exec.Command("git", "cat-file", "commit", rs.Revision)
+	cmd.Dir = rs.GitRootDir
+	if err := cmd.Run(); err != nil {
+		if exitErr := err.(*exec.ExitError); exitErr.ExitCode() == 128 {
+			return fmt.Errorf("invalid revision: %s", rs.Revision)
+		}
+		return fmt.Errorf("failed to validate revision: %v", err)
 	}
 
-	excludePatters, restrictPatterns := make([]string, 0), make([]string, 0)
-	if len(excludeArg) != 0 {
-		excludePatters = strings.Split(excludeArg, ",")
-	}
-	if len(restrictArg) != 0 {
-		restrictPatterns = strings.Split(restrictArg, ",")
+	return nil
+}
+
+func (rs *RepositorySnapshot) getFilesFromGitTree() error {
+	cmd := exec.Command("git", "ls-tree", "-r", rs.Revision)
+	cmd.Dir = rs.GitRootDir
+	out, err := cmd.Output()
+	if err != nil {
+		return err
 	}
 
 	var files []string
@@ -86,22 +121,31 @@ func getFilesFromGitTree(gitRootDir, revisionTree, excludeArg, restrictArg strin
 		fields := strings.Fields(line)
 		if fields[1] == "blob" {
 			file := fields[3]
-			if len(restrictPatterns) != 0 {
-				if matchesAnyPattern(file, restrictPatterns) {
-					files = append(files, file)
+			addFile := false
+			if len(rs.Filters.RestrictPatterns) != 0 {
+				if matchesAnyPattern(file, rs.Filters.RestrictPatterns) {
+					addFile = true
 				}
-			} else if len(excludePatters) != 0 {
-				if !matchesAnyPattern(file, excludePatters) {
+			} else if len(rs.Filters.ExcludePatterns) != 0 {
+				if !matchesAnyPattern(file, rs.Filters.ExcludePatterns) {
+					addFile = true
+				}
+			} else {
+				addFile = true
+			}
+
+			if addFile && len(rs.Filters.Extensions) != 0 {
+				if slices.Contains(rs.Filters.Extensions, filepath.Ext(file)) {
 					files = append(files, file)
 				}
 			} else {
 				files = append(files, file)
 			}
-
 		}
 
 	}
-	return files, nil
+	rs.Files = files
+	return nil
 }
 
 func matchesAnyPattern(file string, excludePatterns []string) bool {
