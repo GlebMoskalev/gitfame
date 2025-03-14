@@ -15,7 +15,8 @@ type Stats struct {
 func CalculateStats(repositoryPath, revision, extensionsArg, excludeArg, restrictArg, languagesArg string, useCommitter bool) {
 	configs.LoadLanguageExtensions()
 	rs, _ := NewRepositorySnapshot(repositoryPath, revision, extensionsArg, excludeArg, restrictArg, languagesArg)
-	blameEntries, _ := GetBlameStats(rs, useCommitter)
+	blameEntries, err := GetBlameStats(rs, useCommitter)
+	fmt.Println(err)
 	for _, entry := range blameEntries {
 		fmt.Println(entry)
 	}

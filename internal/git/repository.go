@@ -119,6 +119,9 @@ func (rs *RepositorySnapshot) getFilesFromGitTree() error {
 	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
 	for _, line := range lines {
 		fields := strings.Fields(line)
+		if len(fields) < 4 {
+			continue
+		}
 		if fields[1] == "blob" {
 			file := fields[3]
 			addFile := false
