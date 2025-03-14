@@ -88,5 +88,7 @@ func CalculateStats(repositoryPath,
 			}
 			fmt.Println(string(b))
 		}
+	default:
+		fmt.Println("error")
 	}
 }
