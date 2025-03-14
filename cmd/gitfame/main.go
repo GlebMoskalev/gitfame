@@ -8,6 +8,9 @@ func main() {
 		"",
 		"",
 		"",
-		"",
-		false)
+		"yaml,c++,markdown,gopher",
+		"lines",
+		"json-lines",
+		false,
+	)
 }

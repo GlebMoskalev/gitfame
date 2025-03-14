@@ -3,7 +3,6 @@ package git
 import (
 	"fmt"
 	"github.com/GlebMoskalev/gitfame/configs"
-	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -63,7 +62,8 @@ func NewRepositorySnapshot(
 		for _, l := range languages {
 			languageExtensions, ok := languagesMap[l]
 			if !ok {
-				return nil, fmt.Errorf("language %q is not in the supported list (available: %v)", l, maps.Keys(languagesMap))
+				continue
+				//return nil, fmt.Errorf("language %q is not in the supported list (available: %v)", l, maps.Keys(languagesMap))
 			}
 			rs.Filters.Extensions = append(rs.Filters.Extensions, languageExtensions...)
 		}

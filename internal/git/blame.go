@@ -96,6 +96,7 @@ func GetBlameStats(rs *RepositorySnapshot, useCommitter bool) ([]*StatsEntry, er
 
 	entries := make([]*StatsEntry, 0, len(result))
 	for _, entry := range result {
+		entry.Files = len(authorFilesMap[entry.Name])
 		entries = append(entries, entry)
 	}
 	return entries, nil
