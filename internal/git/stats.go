@@ -11,13 +11,6 @@ import (
 	"text/tabwriter"
 )
 
-type Stats struct {
-	Name    string
-	Lines   int
-	Commits int
-	Files   int
-}
-
 func CalculateStats(repositoryPath,
 	revision,
 	extensionsArg,
@@ -29,9 +22,16 @@ func CalculateStats(repositoryPath,
 	useCommitter bool) {
 	configs.LoadLanguageExtensions()
 	rs, err := NewRepositorySnapshot(repositoryPath, revision, extensionsArg, excludeArg, restrictArg, languagesArg)
-	fmt.Println(rs, err)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
 	blameEntries, err := GetBlameStats(rs, useCommitter)
-	fmt.Println(err)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 	var funcSort func(i, j int) bool
 	switch orderBy {
 	case "lines":

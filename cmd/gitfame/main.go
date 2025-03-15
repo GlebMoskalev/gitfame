@@ -5,7 +5,6 @@ import (
 	"github.com/GlebMoskalev/gitfame/internal/git"
 	"github.com/spf13/cobra"
 	"os"
-	"strconv"
 )
 
 func init() {
@@ -17,7 +16,7 @@ func init() {
 	rootCmd.Flags().String("extensions", "", "")
 	rootCmd.Flags().String("format", "tabular", "")
 	rootCmd.Flags().String("order-by", "lines", "")
-	rootCmd.Flags().String("use-committer", "false", "")
+	rootCmd.Flags().Bool("use-committer", false, "")
 }
 
 var rootCmd = &cobra.Command{
@@ -63,16 +62,12 @@ var rootCmd = &cobra.Command{
 			fmt.Println(err)
 			os.Exit(1)
 		}
-		useCommitterStr, err := cmd.Flags().GetString("use-committer")
+		useCommitter, err := cmd.Flags().GetBool("use-committer")
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
 		}
-		useCommitter, err := strconv.ParseBool(useCommitterStr)
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
+
 		git.CalculateStats(repository, revision, extensions, exclude, restrictTo, languages, order, format, useCommitter)
 	},
 }
@@ -85,5 +80,15 @@ func Execute() {
 }
 
 func main() {
-	Execute()
+	//Execute()
+	git.CalculateStats(
+		"/Users/glebmoskalev/Downloads/blamebroke",
+		"d5e9958063725c54e82b2e77427bd0dcbaf43fef",
+		"",
+		"",
+		"",
+		"",
+		"lines",
+		"tabular",
+		false)
 }

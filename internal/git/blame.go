@@ -16,19 +16,47 @@ type StatsEntry struct {
 }
 
 func GetBlameStats(rs *RepositorySnapshot, useCommitter bool) ([]*StatsEntry, error) {
+	regHashCommitLog := regexp.MustCompile(`^commit\s\S{40}$`)
+	regAuthorLog := regexp.MustCompile(`^Author:\s(.*)$`)
 	regHashAndLineCommit := regexp.MustCompile(`^\S{40}\s\d+\s\d+\s\d+$`)
 	regAuthor := regexp.MustCompile(`^author\s(.+)$`)
 	regCommitter := regexp.MustCompile(`^committer\s(.+)$`)
 
 	commitStatsMap := make(map[string]*StatsEntry)
 	authorFilesMap := make(map[string]map[string]struct{})
-
+	fmt.Println(rs.Files)
 	for _, file := range rs.Files {
 		cmd := exec.Command("git", "blame", "--porcelain", rs.Revision, file)
 		cmd.Dir = rs.GitRootDir
 		out, err := cmd.Output()
 		if err != nil {
 			return nil, fmt.Errorf("git blame failed for %s: %v", file, err)
+		}
+		if len(out) == 0 {
+			cmd = exec.Command("git", "log", rs.Revision, "--", file)
+			cmd.Dir = rs.GitRootDir
+			out, err = cmd.Output()
+
+			if err != nil {
+				return nil, fmt.Errorf("git log failed for %s: %v", file, err)
+			}
+			linesSplit := strings.Split(string(out), "\n")
+
+			if len(linesSplit) > 3 && regHashCommitLog.MatchString(linesSplit[0]) && regAuthorLog.MatchString(linesSplit[1]) {
+				commit := strings.Split(linesSplit[0], " ")[1]
+				author := strings.TrimSpace(strings.Join(strings.Split(strings.Split(linesSplit[1], "<")[0], " ")[1:], " "))
+				_, ok := commitStatsMap[commit]
+				if !ok {
+					commitStatsMap[commit] = &StatsEntry{
+						Name:  author,
+						Lines: 0,
+					}
+				}
+				if authorFilesMap[author] == nil {
+					authorFilesMap[author] = make(map[string]struct{})
+				}
+				authorFilesMap[author][file] = struct{}{}
+			}
 		}
 		lines := strings.Split(string(out), "\n")
 
@@ -79,6 +107,7 @@ func GetBlameStats(rs *RepositorySnapshot, useCommitter bool) ([]*StatsEntry, er
 			}
 		}
 	}
+
 	result := make(map[string]*StatsEntry)
 	for _, s := range commitStatsMap {
 		stats, ok := result[s.Name]

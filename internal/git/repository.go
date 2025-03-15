@@ -123,7 +123,7 @@ func (rs *RepositorySnapshot) getFilesFromGitTree() error {
 			continue
 		}
 		if fields[1] == "blob" {
-			file := fields[3]
+			file := strings.Join(fields[3:], " ")
 			addFile := false
 			if len(rs.Filters.RestrictPatterns) != 0 {
 				if matchesAnyPattern(file, rs.Filters.RestrictPatterns) {
@@ -141,7 +141,7 @@ func (rs *RepositorySnapshot) getFilesFromGitTree() error {
 				if slices.Contains(rs.Filters.Extensions, filepath.Ext(file)) {
 					files = append(files, file)
 				}
-			} else {
+			} else if addFile {
 				files = append(files, file)
 			}
 		}
