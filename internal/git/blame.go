@@ -24,7 +24,7 @@ func GetBlameStats(rs *RepositorySnapshot, useCommitter bool) ([]*StatsEntry, er
 
 	commitStatsMap := make(map[string]*StatsEntry)
 	authorFilesMap := make(map[string]map[string]struct{})
-	fmt.Println(rs.Files)
+
 	for _, file := range rs.Files {
 		cmd := exec.Command("git", "blame", "--porcelain", rs.Revision, file)
 		cmd.Dir = rs.GitRootDir

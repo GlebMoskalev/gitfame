@@ -82,13 +82,13 @@ func Execute() {
 func main() {
 	//Execute()
 	git.CalculateStats(
-		"/Users/glebmoskalev/Downloads/blamebroke",
-		"d5e9958063725c54e82b2e77427bd0dcbaf43fef",
+		".",
+		"HEAD",
 		"",
 		"",
 		"",
 		"",
-		"lines",
+		"commits",
 		"tabular",
 		false)
 }

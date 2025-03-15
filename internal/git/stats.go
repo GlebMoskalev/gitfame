@@ -8,6 +8,7 @@ import (
 	"os"
 	"sort"
 	"strconv"
+	"strings"
 	"text/tabwriter"
 )
 
@@ -36,15 +37,42 @@ func CalculateStats(repositoryPath,
 	switch orderBy {
 	case "lines":
 		funcSort = func(i, j int) bool {
-			return blameEntries[i].Lines > blameEntries[j].Lines
+			if blameEntries[i].Lines != blameEntries[j].Lines {
+				return blameEntries[i].Lines > blameEntries[j].Lines
+			}
+			if blameEntries[i].Commits != blameEntries[j].Commits {
+				return blameEntries[i].Commits > blameEntries[j].Commits
+			}
+			if blameEntries[i].Files != blameEntries[j].Files {
+				return blameEntries[i].Files > blameEntries[j].Files
+			}
+			return strings.ToLower(blameEntries[i].Name) < strings.ToLower(blameEntries[j].Name)
 		}
 	case "commits":
 		funcSort = func(i, j int) bool {
-			return blameEntries[i].Commits > blameEntries[j].Commits
+			if blameEntries[i].Commits != blameEntries[j].Commits {
+				return blameEntries[i].Commits > blameEntries[j].Commits
+			}
+			if blameEntries[i].Lines != blameEntries[j].Lines {
+				return blameEntries[i].Lines > blameEntries[j].Lines
+			}
+			if blameEntries[i].Files != blameEntries[j].Files {
+				return blameEntries[i].Files > blameEntries[j].Files
+			}
+			return strings.ToLower(blameEntries[i].Name) < strings.ToLower(blameEntries[j].Name)
 		}
 	case "files":
 		funcSort = func(i, j int) bool {
-			return blameEntries[i].Commits > blameEntries[j].Commits
+			if blameEntries[i].Files != blameEntries[j].Files {
+				return blameEntries[i].Files > blameEntries[j].Files
+			}
+			if blameEntries[i].Lines != blameEntries[j].Lines {
+				return blameEntries[i].Lines > blameEntries[j].Lines
+			}
+			if blameEntries[i].Commits != blameEntries[j].Commits {
+				return blameEntries[i].Commits > blameEntries[j].Commits
+			}
+			return strings.ToLower(blameEntries[i].Name) < strings.ToLower(blameEntries[j].Name)
 		}
 	default:
 		fmt.Println("error")
@@ -66,7 +94,7 @@ func CalculateStats(repositoryPath,
 			os.Exit(1)
 		}
 		for _, e := range blameEntries {
-			if err := w.Write([]string{e.Name, strconv.Itoa(e.Files), strconv.Itoa(e.Commits), strconv.Itoa(e.Files)}); err != nil {
+			if err := w.Write([]string{e.Name, strconv.Itoa(e.Lines), strconv.Itoa(e.Commits), strconv.Itoa(e.Files)}); err != nil {
 				fmt.Println(err)
 				os.Exit(1)
 			}
