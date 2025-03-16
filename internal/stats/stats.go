@@ -4,14 +4,15 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
-	"github.com/GlebMoskalev/gitfame/internal/blame"
-	"github.com/GlebMoskalev/gitfame/internal/repository"
 	"io"
 	"os"
 	"sort"
 	"strconv"
 	"strings"
 	"text/tabwriter"
+
+	"github.com/GlebMoskalev/gitfame/internal/blame"
+	"github.com/GlebMoskalev/gitfame/internal/repository"
 )
 
 type outputFormat string
@@ -33,13 +34,13 @@ const (
 
 func CalculateStats(
 	repositoryPath, revision, extensionsArg, excludeArg, restrictArg, languagesArg, orderBy, format string,
-	useCommitter bool) {
+	useCommitter, useProgress bool) {
 	rs, err := repository.NewRepositorySnapshot(repositoryPath, revision, extensionsArg, excludeArg, restrictArg, languagesArg)
 	if err != nil {
 		exitWithError("Failed to create repository snapshot", err)
 	}
 
-	contributors, err := blame.GetContributorStats(rs, useCommitter)
+	contributors, err := blame.GetContributorStats(rs, useCommitter, useProgress)
 	if err != nil {
 		exitWithError("Failed to get contributor statistics", err)
 	}

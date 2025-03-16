@@ -2,11 +2,14 @@ package blame
 
 import (
 	"fmt"
-	"github.com/GlebMoskalev/gitfame/internal/repository"
+	"os"
 	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/GlebMoskalev/gitfame/internal/repository"
+	"github.com/GlebMoskalev/gitfame/pkg/progressbar"
 )
 
 type ContributorStats struct {
@@ -24,12 +27,23 @@ var (
 	regCommitter         = regexp.MustCompile(`^committer\s(.+)$`)
 )
 
-func GetContributorStats(rs *repository.Snapshot, useCommitter bool) ([]*ContributorStats, error) {
+func GetContributorStats(rs *repository.Snapshot, useCommitter, useProgress bool) ([]*ContributorStats, error) {
 	commitStatsMap := make(map[string]*ContributorStats)
 	contributorFilesMap := make(map[string]map[string]struct{})
 
+	var bar *progressbar.ProgressBar
+	if useProgress {
+		bar, _ = progressbar.New(len(rs.Files), os.Stdout)
+	}
+
 	for _, file := range rs.Files {
+		if useProgress && bar != nil {
+			bar.Tick()
+		}
 		if err := processFile(rs, file, commitStatsMap, contributorFilesMap, useCommitter); err != nil {
+			if useProgress && bar != nil {
+				bar.Tick()
+			}
 			return nil, err
 		}
 	}

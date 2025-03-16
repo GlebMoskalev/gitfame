@@ -2,12 +2,13 @@ package repository
 
 import (
 	"fmt"
-	"github.com/GlebMoskalev/gitfame/configs"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
+
+	"github.com/GlebMoskalev/gitfame/configs"
 )
 
 type Snapshot struct {
