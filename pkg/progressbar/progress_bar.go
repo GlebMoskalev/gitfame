@@ -36,6 +36,12 @@ func New(t int, out io.Writer) (*ProgressBar, error) {
 	return b, nil
 }
 
+func (b *ProgressBar) Total(t int) {
+	if t > 0 {
+		b.total = t
+	}
+}
+
 func (b *ProgressBar) Tick() {
 	if b.closed || b.err != nil {
 		return

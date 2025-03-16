@@ -2,7 +2,6 @@ package blame
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -27,21 +26,20 @@ var (
 	regCommitter         = regexp.MustCompile(`^committer\s(.+)$`)
 )
 
-func GetContributorStats(rs *repository.Snapshot, useCommitter, useProgress bool) ([]*ContributorStats, error) {
+func GetContributorStats(rs *repository.Snapshot, useCommitter bool, bar *progressbar.ProgressBar) ([]*ContributorStats, error) {
 	commitStatsMap := make(map[string]*ContributorStats)
 	contributorFilesMap := make(map[string]map[string]struct{})
 
-	var bar *progressbar.ProgressBar
-	if useProgress {
-		bar, _ = progressbar.New(len(rs.Files), os.Stdout)
+	if bar != nil {
+		bar.Total(len(rs.Files))
 	}
 
 	for _, file := range rs.Files {
-		if useProgress && bar != nil {
+		if bar != nil {
 			bar.Tick()
 		}
 		if err := processFile(rs, file, commitStatsMap, contributorFilesMap, useCommitter); err != nil {
-			if useProgress && bar != nil {
+			if bar != nil {
 				bar.Tick()
 			}
 			return nil, err

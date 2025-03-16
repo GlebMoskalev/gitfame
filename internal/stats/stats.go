@@ -4,6 +4,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"github.com/GlebMoskalev/gitfame/pkg/progressbar"
 	"io"
 	"os"
 	"sort"
@@ -35,12 +36,17 @@ const (
 func CalculateStats(
 	repositoryPath, revision, extensionsArg, excludeArg, restrictArg, languagesArg, orderBy, format string,
 	useCommitter, useProgress bool) {
+	var bar *progressbar.ProgressBar
+	if useProgress {
+		bar, _ = progressbar.New(2, os.Stdout)
+	}
+
 	rs, err := repository.NewRepositorySnapshot(repositoryPath, revision, extensionsArg, excludeArg, restrictArg, languagesArg)
 	if err != nil {
 		exitWithError("Failed to create repository snapshot", err)
 	}
 
-	contributors, err := blame.GetContributorStats(rs, useCommitter, useProgress)
+	contributors, err := blame.GetContributorStats(rs, useCommitter, bar)
 	if err != nil {
 		exitWithError("Failed to get contributor statistics", err)
 	}
