@@ -46,10 +46,7 @@ func CalculateStats(
 		exitWithError("Failed to create repository snapshot", err)
 	}
 
-	contributors, err := blame.GetContributorStats(rs, useCommitter, bar)
-	if err != nil {
-		exitWithError("Failed to get contributor statistics", err)
-	}
+	contributors := blame.GetContributorStats(rs, useCommitter, bar)
 
 	sortContributors(contributors, sortField(orderBy))
 

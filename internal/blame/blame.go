@@ -1,7 +1,6 @@
 package blame
 
 import (
-	"context"
 	"fmt"
 	"os/exec"
 	"regexp"
@@ -29,52 +28,50 @@ var (
 	regCommitter         = regexp.MustCompile(`^committer\s(.+)$`)
 )
 
-func GetContributorStats(rs *repository.Snapshot, useCommitter bool, bar *progressbar.ProgressBar) ([]*ContributorStats, error) {
+type fileError struct {
+	file string
+	err  error
+}
+
+func GetContributorStats(rs *repository.Snapshot, useCommitter bool, bar *progressbar.ProgressBar) []*ContributorStats {
 	commitStatsMap := make(map[string]*ContributorStats)
 	contributorFilesMap := make(map[string]map[string]struct{})
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	var mu sync.Mutex
 	var wg sync.WaitGroup
-	errChan := make(chan error, len(rs.Files))
+	errChan := make(chan fileError, len(rs.Files))
 	semaphore := make(chan struct{}, runtime.NumCPU())
 	if bar != nil {
 		bar.Total(len(rs.Files))
+		defer bar.Close()
 	}
 
 	for _, file := range rs.Files {
-		select {
-		case <-ctx.Done():
-			break
-		default:
-			wg.Add(1)
-			semaphore <- struct{}{}
-			go func(f string) {
-				defer wg.Done()
-				defer func() { <-semaphore }()
-				err := processFile(rs, file, commitStatsMap, contributorFilesMap, useCommitter, &mu)
-				if err != nil {
-					errChan <- err
+		wg.Add(1)
+		semaphore <- struct{}{}
+		go func(f string) {
+			defer wg.Done()
+			defer func() { <-semaphore }()
+			err := processFile(rs, file, commitStatsMap, contributorFilesMap, useCommitter, &mu)
+			if err != nil {
+				errChan <- fileError{
+					file: file,
+					err:  err,
 				}
-				if bar != nil {
-					bar.Tick()
-				}
-			}(file)
-		}
+			}
+			if bar != nil {
+				bar.Tick()
+			}
+		}(file)
 	}
 
-	go func() {
-		wg.Wait()
-		close(errChan)
-	}()
-
-	err := <-errChan
-	if err != nil {
-		return nil, err
+	wg.Wait()
+	close(errChan)
+	for e := range errChan {
+		fmt.Printf("Error in file %q: %v\n", e.file, e.err)
 	}
+
 	result := aggregateResults(commitStatsMap, contributorFilesMap)
-	return result, nil
-
+	return result
 }
 
 func processFile(rs *repository.Snapshot, file string, commitStatsMap map[string]*ContributorStats,
