@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"os/exec"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/GlebMoskalev/gitfame/internal/repository"
 	"github.com/GlebMoskalev/gitfame/pkg/progressbar"
@@ -29,21 +31,34 @@ var (
 func GetContributorStats(rs *repository.Snapshot, useCommitter bool, bar *progressbar.ProgressBar) ([]*ContributorStats, error) {
 	commitStatsMap := make(map[string]*ContributorStats)
 	contributorFilesMap := make(map[string]map[string]struct{})
-
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	errChan := make(chan error, len(rs.Files))
+	semaphore := make(chan struct{}, runtime.NumCPU())
 	if bar != nil {
 		bar.Total(len(rs.Files))
 	}
 
 	for _, file := range rs.Files {
-		if bar != nil {
-			bar.Tick()
-		}
-		if err := processFile(rs, file, commitStatsMap, contributorFilesMap, useCommitter); err != nil {
+		wg.Add(1)
+		semaphore <- struct{}{}
+		go func(f string) {
+			defer wg.Done()
+			defer func() { <-semaphore }()
+			err := processFile(rs, file, commitStatsMap, contributorFilesMap, useCommitter, &mu)
+			if err != nil {
+				errChan <- err
+			}
 			if bar != nil {
 				bar.Tick()
 			}
-			return nil, err
-		}
+		}(file)
+	}
+
+	wg.Wait()
+	close(errChan)
+	for err := range errChan {
+		return nil, err
 	}
 
 	result := aggregateResults(commitStatsMap, contributorFilesMap)
@@ -52,7 +67,7 @@ func GetContributorStats(rs *repository.Snapshot, useCommitter bool, bar *progre
 }
 
 func processFile(rs *repository.Snapshot, file string, commitStatsMap map[string]*ContributorStats,
-	contributorFilesMap map[string]map[string]struct{}, useCommitter bool) error {
+	contributorFilesMap map[string]map[string]struct{}, useCommitter bool, mu *sync.Mutex) error {
 	cmd := exec.Command("git", "blame", "--porcelain", rs.Revision, file)
 	cmd.Dir = rs.GitRootDir
 	out, err := cmd.Output()
@@ -61,15 +76,15 @@ func processFile(rs *repository.Snapshot, file string, commitStatsMap map[string
 	}
 
 	if len(out) == 0 {
-		return processEmptyFile(rs, file, commitStatsMap, contributorFilesMap)
+		return processEmptyFile(rs, file, commitStatsMap, contributorFilesMap, mu)
 	}
 	lines := strings.Split(string(out), "\n")
-	return processBlameOutput(lines, commitStatsMap, contributorFilesMap, file, useCommitter)
+	return processBlameOutput(lines, commitStatsMap, contributorFilesMap, file, useCommitter, mu)
 
 }
 
 func processEmptyFile(rs *repository.Snapshot, file string, commitStatsMap map[string]*ContributorStats,
-	contributorFilesMap map[string]map[string]struct{}) error {
+	contributorFilesMap map[string]map[string]struct{}, mu *sync.Mutex) error {
 	cmd := exec.Command("git", "log", rs.Revision, "--", file)
 	cmd.Dir = rs.GitRootDir
 	out, err := cmd.Output()
@@ -85,8 +100,10 @@ func processEmptyFile(rs *repository.Snapshot, file string, commitStatsMap map[s
 	commit := strings.Split(linesSplit[0], " ")[1]
 	authorLine := linesSplit[1][len("Author: "):]
 	author := extractName(authorLine)
-	_, ok := commitStatsMap[commit]
-	if !ok {
+
+	mu.Lock()
+	defer mu.Unlock()
+	if _, ok := commitStatsMap[commit]; !ok {
 		commitStatsMap[commit] = &ContributorStats{
 			Name:  author,
 			Lines: 0,
@@ -105,7 +122,7 @@ func extractName(authorLine string) string {
 }
 
 func processBlameOutput(lines []string, commitStatsMap map[string]*ContributorStats,
-	contributorFilesMap map[string]map[string]struct{}, file string, useCommitter bool) error {
+	contributorFilesMap map[string]map[string]struct{}, file string, useCommitter bool, mu *sync.Mutex) error {
 	for i := 0; i < len(lines); i++ {
 		if !regHashAndLineCommit.MatchString(lines[i]) {
 			continue
@@ -113,6 +130,8 @@ func processBlameOutput(lines []string, commitStatsMap map[string]*ContributorSt
 
 		lineSplit := strings.Split(lines[i], " ")
 		commit := lineSplit[0]
+
+		mu.Lock()
 		stats, ok := commitStatsMap[commit]
 		if !ok {
 			stats = findAuthorInfo(lines, i, commit, commitStatsMap, useCommitter)
@@ -127,6 +146,7 @@ func processBlameOutput(lines []string, commitStatsMap map[string]*ContributorSt
 		}
 		stats.Lines += lineCount
 		ensureContributorFilesMap(contributorFilesMap, stats.Name, file)
+		mu.Unlock()
 	}
 	return nil
 

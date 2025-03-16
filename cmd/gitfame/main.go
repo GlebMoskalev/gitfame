@@ -106,17 +106,17 @@ func validateOptions(opts *cliOptions) error {
 }
 
 func main() {
-	//Execute()
-	stats.CalculateStats(
-		"/Users/glebmoskalev/Учеба/Go yandex/GlebMoskalev",
-		"HEAD",
-		"",
-		"",
-		"",
-		"",
-		"",
-		"tabular",
-		false,
-		false,
-	)
+	Execute()
+	//stats.CalculateStats(
+	//	"/Users/glebmoskalev/Учеба/Go yandex/GlebMoskalev",
+	//	"HEAD",
+	//	"",
+	//	"",
+	//	"",
+	//	"",
+	//	"lines",
+	//	"tabular",
+	//	false,
+	//	false,
+	//)
 }
