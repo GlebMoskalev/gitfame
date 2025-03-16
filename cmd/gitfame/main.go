@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/GlebMoskalev/gitfame/internal/git"
+	"github.com/GlebMoskalev/gitfame/internal/stats"
 	"github.com/spf13/cobra"
 	"os"
 )
@@ -68,7 +68,7 @@ var rootCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		git.CalculateStats(repository, revision, extensions, exclude, restrictTo, languages, order, format, useCommitter)
+		stats.CalculateStats(repository, revision, extensions, exclude, restrictTo, languages, order, format, useCommitter)
 	},
 }
 
@@ -80,15 +80,15 @@ func Execute() {
 }
 
 func main() {
-	//Execute()
-	git.CalculateStats(
-		".",
-		"HEAD",
-		"",
-		"",
-		"",
-		"",
-		"commits",
-		"tabular",
-		false)
+	Execute()
+	//stats.CalculateStats(
+	//	".",
+	//	"HEAD",
+	//	"",
+	//	"",
+	//	"",
+	//	"",
+	//	"commits",
+	//	"tabular",
+	//	false)
 }

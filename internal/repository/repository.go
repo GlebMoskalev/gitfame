@@ -1,4 +1,4 @@
-package git
+package repository
 
 import (
 	"fmt"
@@ -10,13 +10,12 @@ import (
 	"strings"
 )
 
-type RepositorySnapshot struct {
+type Snapshot struct {
 	GitRootDir string
 	Files      []string
 	Revision   string
 	Filters    Filters
 }
-
 type Filters struct {
 	ExcludePatterns  []string
 	RestrictPatterns []string
@@ -29,44 +28,17 @@ func NewRepositorySnapshot(
 	extensionsArg,
 	excludeArg,
 	restrictArg,
-	languagesArg string) (*RepositorySnapshot, error) {
-	rs := &RepositorySnapshot{
+	languagesArg string) (*Snapshot, error) {
+	rs := &Snapshot{
 		Revision: revision,
+		Filters:  createFilters(extensionsArg, excludeArg, restrictArg, languagesArg),
 	}
 	if err := rs.getGitRootDir(repositoryPath); err != nil {
 		return nil, err
 	}
+
 	if err := rs.validateRevision(); err != nil {
 		return nil, err
-	}
-	excludePatters, restrictPatterns, extensions := make([]string, 0), make([]string, 0), make([]string, 0)
-	if excludeArg != "" {
-		excludePatters = strings.Split(excludeArg, ",")
-	}
-	if restrictArg != "" {
-		restrictPatterns = strings.Split(restrictArg, ",")
-	}
-	if extensionsArg != "" {
-		extensions = strings.Split(extensionsArg, ",")
-	}
-	rs.Filters.ExcludePatterns = excludePatters
-	rs.Filters.RestrictPatterns = restrictPatterns
-	rs.Filters.Extensions = extensions
-
-	if languagesArg != "" {
-		languagesMap, err := configs.LoadLanguageExtensions()
-		if err != nil {
-			return nil, err
-		}
-		languages := strings.Split(languagesArg, ",")
-		for _, l := range languages {
-			languageExtensions, ok := languagesMap[l]
-			if !ok {
-				continue
-				//return nil, fmt.Errorf("language %q is not in the supported list (available: %v)", l, maps.Keys(languagesMap))
-			}
-			rs.Filters.Extensions = append(rs.Filters.Extensions, languageExtensions...)
-		}
 	}
 
 	if err := rs.getFilesFromGitTree(); err != nil {
@@ -74,9 +46,39 @@ func NewRepositorySnapshot(
 	}
 
 	return rs, nil
+
 }
 
-func (rs *RepositorySnapshot) getGitRootDir(path string) error {
+func createFilters(extensionsArg, excludeArg, restrictArg, languagesArg string) Filters {
+	filters := Filters{
+		ExcludePatterns:  splitIfNotEmpty(excludeArg),
+		RestrictPatterns: splitIfNotEmpty(restrictArg),
+		Extensions:       splitIfNotEmpty(extensionsArg),
+	}
+	if languagesArg != "" {
+		languagesMap, err := configs.LoadLanguageExtensions()
+		if err == nil {
+			languages := strings.Split(languagesArg, ",")
+			for _, l := range languages {
+				languageExtensions, ok := languagesMap[l]
+				if !ok {
+					continue
+				}
+				filters.Extensions = append(filters.Extensions, languageExtensions...)
+			}
+		}
+	}
+	return filters
+}
+
+func splitIfNotEmpty(s string) []string {
+	if s == "" {
+		return []string{}
+	}
+	return strings.Split(s, ",")
+}
+
+func (rs *Snapshot) getGitRootDir(path string) error {
 	if _, err := os.Stat(path); err != nil {
 		return fmt.Errorf("directory does not exist: %s", path)
 	}
@@ -86,15 +88,16 @@ func (rs *RepositorySnapshot) getGitRootDir(path string) error {
 	out, err := cmd.Output()
 	if err != nil {
 		if exitErr := err.(*exec.ExitError); exitErr.ExitCode() == 128 {
-			return fmt.Errorf("not a git repository: %s:", path)
+			return fmt.Errorf("not a git repository: %s", path)
 		}
 		return fmt.Errorf("failed to get git root: %v", err)
 	}
 	rs.GitRootDir = strings.TrimSpace(string(out))
 	return nil
+
 }
 
-func (rs *RepositorySnapshot) validateRevision() error {
+func (rs *Snapshot) validateRevision() error {
 	cmd := exec.Command("git", "cat-file", "commit", rs.Revision)
 	cmd.Dir = rs.GitRootDir
 	if err := cmd.Run(); err != nil {
@@ -105,9 +108,10 @@ func (rs *RepositorySnapshot) validateRevision() error {
 	}
 
 	return nil
+
 }
 
-func (rs *RepositorySnapshot) getFilesFromGitTree() error {
+func (rs *Snapshot) getFilesFromGitTree() error {
 	cmd := exec.Command("git", "ls-tree", "-r", rs.Revision)
 	cmd.Dir = rs.GitRootDir
 	out, err := cmd.Output()
@@ -129,12 +133,13 @@ func (rs *RepositorySnapshot) getFilesFromGitTree() error {
 				if matchesAnyPattern(file, rs.Filters.RestrictPatterns) {
 					addFile = true
 				}
-			} else if len(rs.Filters.ExcludePatterns) != 0 {
-				if !matchesAnyPattern(file, rs.Filters.ExcludePatterns) {
-					addFile = true
-				}
 			} else {
 				addFile = true
+			}
+			if len(rs.Filters.ExcludePatterns) != 0 {
+				if matchesAnyPattern(file, rs.Filters.ExcludePatterns) {
+					addFile = false
+				}
 			}
 
 			if addFile && len(rs.Filters.Extensions) != 0 {
@@ -149,6 +154,40 @@ func (rs *RepositorySnapshot) getFilesFromGitTree() error {
 	}
 	rs.Files = files
 	return nil
+
+}
+
+func (rs *Snapshot) filterRepoFiles(lines []string) []string {
+	var files []string
+	for _, line := range lines {
+		fields := strings.Fields(line)
+		if len(fields) < 4 || fields[1] != "blob" {
+			continue
+		}
+		file := strings.Join(fields[3:], " ")
+		if rs.shouldIncludeFile(file) {
+			files = append(files, file)
+		}
+	}
+	return files
+}
+
+func (rs *Snapshot) shouldIncludeFile(file string) bool {
+	if len(rs.Filters.RestrictPatterns) > 0 {
+		if !matchesAnyPattern(file, rs.Filters.ExcludePatterns) {
+			return false
+		}
+	}
+
+	if len(rs.Filters.ExcludePatterns) > 0 && matchesAnyPattern(file, rs.Filters.ExcludePatterns) {
+		return false
+	}
+
+	if len(rs.Filters.Extensions) > 0 {
+		return slices.Contains(rs.Filters.Extensions, filepath.Ext(file))
+	}
+	return true
+
 }
 
 func matchesAnyPattern(file string, excludePatterns []string) bool {
