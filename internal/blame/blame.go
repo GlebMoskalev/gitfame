@@ -1,6 +1,7 @@
 package blame
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"regexp"
@@ -31,6 +32,8 @@ var (
 func GetContributorStats(rs *repository.Snapshot, useCommitter bool, bar *progressbar.ProgressBar) ([]*ContributorStats, error) {
 	commitStatsMap := make(map[string]*ContributorStats)
 	contributorFilesMap := make(map[string]map[string]struct{})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	errChan := make(chan error, len(rs.Files))
@@ -40,27 +43,35 @@ func GetContributorStats(rs *repository.Snapshot, useCommitter bool, bar *progre
 	}
 
 	for _, file := range rs.Files {
-		wg.Add(1)
-		semaphore <- struct{}{}
-		go func(f string) {
-			defer wg.Done()
-			defer func() { <-semaphore }()
-			err := processFile(rs, file, commitStatsMap, contributorFilesMap, useCommitter, &mu)
-			if err != nil {
-				errChan <- err
-			}
-			if bar != nil {
-				bar.Tick()
-			}
-		}(file)
+		select {
+		case <-ctx.Done():
+			break
+		default:
+			wg.Add(1)
+			semaphore <- struct{}{}
+			go func(f string) {
+				defer wg.Done()
+				defer func() { <-semaphore }()
+				err := processFile(rs, file, commitStatsMap, contributorFilesMap, useCommitter, &mu)
+				if err != nil {
+					errChan <- err
+				}
+				if bar != nil {
+					bar.Tick()
+				}
+			}(file)
+		}
 	}
 
-	wg.Wait()
-	close(errChan)
-	for err := range errChan {
+	go func() {
+		wg.Wait()
+		close(errChan)
+	}()
+
+	err := <-errChan
+	if err != nil {
 		return nil, err
 	}
-
 	result := aggregateResults(commitStatsMap, contributorFilesMap)
 	return result, nil
 
