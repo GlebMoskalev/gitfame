@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 )
 
 type ProgressBar struct {
@@ -15,6 +16,7 @@ type ProgressBar struct {
 	suffix                 string
 	out                    io.Writer
 	err                    error
+	mu                     sync.Mutex
 }
 
 func New(t int, out io.Writer) (*ProgressBar, error) {
@@ -37,6 +39,8 @@ func New(t int, out io.Writer) (*ProgressBar, error) {
 }
 
 func (b *ProgressBar) Total(t int) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	if t > 0 {
 		b.total = t
 	}
@@ -66,6 +70,8 @@ func (b *ProgressBar) render() {
 }
 
 func (b *ProgressBar) Close() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	if !b.closed {
 		b.closed = true
 		_, err := fmt.Fprintf(b.out, "\r%s\r", strings.Repeat(" ", 10))
