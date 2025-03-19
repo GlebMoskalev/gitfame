@@ -1,0 +1,3 @@
+name: complex repo with restrict
+args: [--restrict-to, "*.go"]
+bundle: complex.bundle

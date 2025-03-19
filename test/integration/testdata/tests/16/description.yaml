@@ -1,0 +1,4 @@
+name: basic repo with bad order by
+args: [--order-by, commlits]
+error: true
+bundle: basic.bundle

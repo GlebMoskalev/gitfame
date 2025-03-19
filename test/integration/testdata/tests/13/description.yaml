@@ -1,0 +1,3 @@
+name: complex repo with head minus two
+args: [--revision, HEAD~2]
+bundle: complex.bundle

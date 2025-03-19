@@ -1,0 +1,3 @@
+name: complex repo with use-commiter
+args: [--use-committer]
+bundle: use-committer.bundle

@@ -1,0 +1,4 @@
+name: basic repo with multi author and format json
+args: [--format, json]
+bundle: multi-author.bundle
+format: json

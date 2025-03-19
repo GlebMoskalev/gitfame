@@ -1,0 +1,3 @@
+name: basic repo with single author without arguments
+args: []
+bundle: basic.bundle

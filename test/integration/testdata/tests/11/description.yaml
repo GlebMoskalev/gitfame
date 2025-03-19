@@ -1,0 +1,3 @@
+name: complex repo with exclude and restrict
+args: [--exclude, "*.py", --restrict-to, ".py"]
+bundle: complex.bundle

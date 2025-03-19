@@ -1,0 +1,3 @@
+name: basic repo with multi author and order by files
+args: [--order-by, files]
+bundle: multi-author.bundle

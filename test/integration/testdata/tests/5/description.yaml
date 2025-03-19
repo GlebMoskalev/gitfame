@@ -1,0 +1,4 @@
+name: basic repo with multi author and format csv
+args: [--format, csv]
+bundle: multi-author.bundle
+format: csv

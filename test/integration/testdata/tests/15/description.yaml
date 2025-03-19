@@ -1,0 +1,4 @@
+name: basic repo with bad format
+args: [--format, jfon]
+error: true
+bundle: basic.bundle
