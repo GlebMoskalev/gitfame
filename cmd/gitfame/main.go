@@ -45,7 +45,7 @@ func init() {
 	rootCmd.Flags().StringVar(&options.restrictTo, "restrict-to", "", "Restrict analysis to files matching pattern")
 	rootCmd.Flags().StringVar(&options.languages, "languages", "", "Filter by language")
 	rootCmd.Flags().StringVar(&options.extensions, "extensions", "", "Filter by file extensions")
-	rootCmd.Flags().StringVar(&options.format, "format", "tabular", "Output format (tabular, csv, json)")
+	rootCmd.Flags().StringVar(&options.format, "format", "tabular", "Output format (tabular, csv, json, json-lines)")
 	rootCmd.Flags().StringVar(&options.orderBy, "order-by", "lines", "Order results by (lines, commits, files)")
 	rootCmd.Flags().BoolVar(&options.useCommitter, "use-committer", false, "Use committer instead of author")
 	rootCmd.Flags().BoolVar(&options.showProgress, "progress", false, "Display progress bar during analysis")
